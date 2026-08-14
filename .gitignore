@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+ENV/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# macOS system files
+.DS_Store
+
+# Data files (in case datasets are added locally later)
+*.csv
+*.tsv
+*.xlsx
+*.parquet
+*.db
+*.sqlite
