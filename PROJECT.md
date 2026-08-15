@@ -3,6 +3,10 @@
 ## Overview
 Hospital readmissions are a major focus for healthcare systems because they are costly and often serve as an indicator of the quality of patient care. This project aims to analyze historical patient clinical records to identify key drivers of readmissions (specifically within 30 days of discharge) and build a predictive model to identify high-risk patients.
 
+## Data Source & Database Hosting
+- **Data Source**: [UCI Diabetes 130-US Hospitals (1999-2008) Dataset](https://archive.ics.uci.edu/dataset/296/diabetes+130-us+hospitals+for+years+1999-2008)
+- **Database Hosting**: [Neon Serverless PostgreSQL Branch](https://console.neon.tech/app/projects/cold-brook-55376009/branches/br-flat-glade-ayhi7hms/)
+
 ## Objectives
 1. **Explore & Profile**: Analyze patient demographics, primary diagnoses, admission types, and lengths of stay to understand their correlation with readmission.
 2. **Predictive Modeling**: Train a machine learning classifier to predict the probability of a patient being readmitted within 30 days.
