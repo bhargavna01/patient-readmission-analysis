@@ -7,6 +7,15 @@ Hospital readmissions are a major focus for healthcare systems because they are 
 - **Data Source**: [UCI Diabetes 130-US Hospitals (1999-2008) Dataset](https://archive.ics.uci.edu/dataset/296/diabetes+130-us+hospitals+for+years+1999-2008)
 - **Database Hosting**: [Neon Serverless PostgreSQL Branch](https://console.neon.tech/app/projects/cold-brook-55376009/branches/br-flat-glade-ayhi7hms/)
 
+## Methodology: Polars vs. PostgreSQL (PSQL) Benchmarking
+To test coding proficiency and evaluate execution efficiency, all data cleaning, profiling, and transformation tasks will be performed side-by-side using two parallel approaches:
+1. **Polars**: A highly optimized, multi-threaded DataFrame library in Python built on the Apache Arrow memory model.
+2. **PostgreSQL (PSQL)**: A robust relational database management system hosted on Neon serverless PostgreSQL.
+
+This dual pipeline allows us to benchmark:
+- Development speed and syntax readability (SQL vs. Polars Expression API).
+- Execution efficiency (in-memory processing vs. relational database query planner).
+
 ## Objectives
 1. **Explore & Profile**: Analyze patient demographics, primary diagnoses, admission types, and lengths of stay to understand their correlation with readmission.
 2. **Predictive Modeling**: Train a machine learning classifier to predict the probability of a patient being readmitted within 30 days.
