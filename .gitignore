@@ -21,3 +21,6 @@ ENV/
 *.parquet
 *.db
 *.sqlite
+.env.local
+.vscode/
+
