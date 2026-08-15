@@ -19,24 +19,53 @@ Hospital readmissions are a major focus for healthcare systems because they are 
   - Recall/Sensitivity (To minimize false negatives and identify as many high-risk patients as possible)
   - Precision/Positive Predictive Value (To target resources effectively)
 
-## Data Dictionary (Target Schema)
-We assume a clinical database containing the following core attributes:
+## Dataset Profile
+- **Instances**: 101,766
+- **Attributes**: 50 (including identifiers, demographics, clinical features, test results, medications, and outcomes)
+- **Timeframe**: 10 years (1999–2008) of clinical care across 130 US hospitals and integrated delivery networks.
+- **Missing Values**: Present (encoded as `?` in the raw CSV, e.g., in `weight`, `payer_code`, and `medical_specialty`).
 
-| Column Name | Data Type | Description |
-|---|---|---|
-| `encounter_id` | INTEGER | Unique identifier for the hospital encounter/admission |
-| `patient_id` | INTEGER | Unique identifier for the patient |
-| `age` | VARCHAR / INTEGER | Age or age group of the patient |
-| `gender` | VARCHAR | Gender of the patient (Male, Female, etc.) |
-| `admission_type` | VARCHAR | Emergency, Urgent, Elective, Newborn, etc. |
-| `length_of_stay` | INTEGER | Total days spent in the hospital during the encounter |
-| `primary_diagnosis_code` | VARCHAR | ICD-9 or ICD-10 code for the primary diagnosis |
-| `num_lab_procedures` | INTEGER | Number of lab tests performed during the encounter |
-| `num_medications` | INTEGER | Number of unique medications prescribed |
-| `number_emergency_visits` | INTEGER | Number of emergency room visits by the patient in the preceding year |
-| `number_inpatient_visits` | INTEGER | Number of inpatient admissions by the patient in the preceding year |
-| `discharge_disposition` | VARCHAR | Discharge destination (e.g., Home, Rehab, Hospice) |
-| `readmitted_flag` | BOOLEAN / VARCHAR | Target variable: whether the patient was readmitted within 30 days |
+### Inclusion Criteria
+An encounter was included in the dataset only if it satisfied the following:
+1. It is an inpatient encounter (hospital admission).
+2. It is a diabetic encounter (any kind of diabetes was entered into the system as a diagnosis).
+3. The length of stay was between 1 day and 14 days.
+4. Laboratory tests were performed during the encounter.
+5. Medications were administered during the encounter.
+
+## Data Dictionary (UCI Schema)
+
+| Category | Column Name | Data Type | Description |
+|---|---|---|---|
+| **Identifiers** | `encounter_id` | INTEGER | Unique identifier of an encounter |
+| | `patient_nbr` | INTEGER | Unique identifier of a patient |
+| **Demographics** | `race` | VARCHAR | Caucasian, Asian, African American, Hispanic, Other |
+| | `gender` | VARCHAR | Male, Female, Unknown/Invalid |
+| | `age` | VARCHAR | Grouped in 10-year intervals: `[0, 10)`, `[10, 20)`, ..., `[90, 100)` |
+| | `weight` | VARCHAR | Patient weight in pounds (highly missing) |
+| **Admission/Discharge** | `admission_type_id` | INTEGER | Code corresponding to 9 values (Emergency, Urgent, Elective, Newborn, etc.) |
+| | `discharge_disposition_id` | INTEGER | Code corresponding to 29 values (Discharged to home, expired, etc.) |
+| | `admission_source_id` | INTEGER | Code corresponding to 21 values (Physician referral, Emergency Room, etc.) |
+| | `time_in_hospital` | INTEGER | Number of days between admission and discharge (1-14) |
+| | `payer_code` | VARCHAR | Code corresponding to 17 values (e.g., Blue Cross/Blue Shield, Self Pay, Medicare) |
+| | `medical_specialty` | VARCHAR | Specialty of the admitting physician (e.g., Cardiology, Internal Medicine, Pediatrics) |
+| **Diagnostics & Utilization** | `num_lab_procedures` | INTEGER | Number of lab tests performed during the encounter |
+| | `num_procedures` | INTEGER | Number of non-lab procedures performed during the encounter |
+| | `num_medications` | INTEGER | Number of unique medications prescribed during the encounter |
+| | `number_outpatient` | INTEGER | Number of outpatient visits of the patient in the preceding year |
+| | `number_emergency` | INTEGER | Number of emergency visits of the patient in the preceding year |
+| | `number_inpatient` | INTEGER | Number of inpatient visits of the patient in the preceding year |
+| | `diag_1` | VARCHAR | Primary diagnosis code (first 3 digits of ICD-9) |
+| | `diag_2` | VARCHAR | Secondary diagnosis code (first 3 digits of ICD-9) |
+| | `diag_3` | VARCHAR | Additional secondary diagnosis code (first 3 digits of ICD-9) |
+| | `number_diagnoses` | INTEGER | Number of diagnoses entered into the system |
+| **Lab/Test Results** | `max_glu_serum` | VARCHAR | Result of glucose serum test (`>200`, `>300`, `normal`, `none` if not taken) |
+| | `A1Cresult` | VARCHAR | Result of HbA1c test (`>8`, `>7`, `normal`, `none` if not taken) |
+| **Medications** | 24 specific drugs | VARCHAR | Indicators for 24 specific diabetes medications (e.g., `metformin`, `repaglinide`, `glipizide`, `glyburide`, `insulin`, etc.). Values: `up` (dose increased), `down` (dose decreased), `steady` (dose stable), `no` (not prescribed) |
+| | `change` | VARCHAR | Indicates if there was a change in diabetic medications (`change`, `no change`) |
+| | `diabetesMed` | VARCHAR | Indicates if any diabetic medication was prescribed (`yes`, `no`) |
+| **Target Variable** | `readmitted` | VARCHAR | **Target**: `<30` (readmitted in <30 days), `>30` (readmitted in >30 days), `NO` (no readmission) |
+
 
 ## Analysis Workflow
 1. **SQL Staging & Extraction**: Standardize raw EHR data, handle null keys, and load into a structured table.
