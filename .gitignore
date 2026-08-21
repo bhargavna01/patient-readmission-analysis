@@ -22,5 +22,6 @@ ENV/
 *.db
 *.sqlite
 .env.local
+.env
 .vscode/
 
