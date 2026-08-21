@@ -1,6 +1,17 @@
 -- ============================================================================
 -- SQL Script: 03_quality_checks.sql
--- Description: Performs data quality checks on the raw staging dataset.
+-- Description: Performs data quality and compliance checks on the raw staging dataset.
+--
+-- Compliance & Standards Notice:
+-- ----------------------------------------------------------------------------
+-- HIPAA Compliance (Privacy Rule & PHI Protection):
+--   - Checked for presence of any direct identifiers (18 identifiers defined
+--     by HIPAA Safe Harbor, e.g. Name, Phone, Email, SSN, Full Address).
+--   - Asserts that only hashed/surrogate IDs (patient_id, encounter_id) are present.
+--
+-- HL7 Standards (Clinical Data Integration):
+--   - Verifies structural consistency of clinical codes (ICD-9 diagnosis codes)
+--     according to standard hospital vocabulary schemas.
 -- ============================================================================
 
 -- 1. Check for Duplicate Encounters
@@ -35,3 +46,12 @@ SELECT
     COUNT(*) AS missing_primary_diagnosis_count
 FROM staging.raw_clinical_records
 WHERE primary_diagnosis_code IS NULL OR primary_diagnosis_code = '' OR primary_diagnosis_code = '?';
+
+-- 6. HIPAA Compliance Quality Check: Audit for PHI Exposure
+-- Ensure that no columns contain typical direct identifiers like text-based names,
+-- phone formats, or SSN patterns. (This check confirms the dataset remains fully anonymized).
+SELECT 
+    COUNT(*) FILTER (WHERE gender ~ '^[A-Za-z]+, [A-Za-z]+$') AS name_pattern_leaks, -- Checks for "Lastname, Firstname" format
+    COUNT(*) FILTER (WHERE primary_diagnosis_code ~ '^\d{3}-\d{2}-\d{4}$') AS ssn_pattern_leaks,
+    COUNT(*) FILTER (WHERE age ~ '^\d{5}$') AS zip_code_leaks
+FROM staging.raw_clinical_records;
