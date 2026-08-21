@@ -83,7 +83,7 @@ Once logged in, deploy your managed PostgreSQL database cluster:
      ```
    - Example URI structure:
      ```text
-     postgresql://neondb_owner:npg_SuofE2s6HWiV@ep-dry-flower-ayu8lyw9-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require
+     postgresql://neondb_owner:npg_rgwvOKePYN93@ep-dry-flower-ayu8lyw9-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require
      ```
    > ⚠️ **Important**: Save your password immediately. Neon passwords are generated securely and shown once during initial role creation.
 
@@ -231,21 +231,39 @@ jobs:
 
 ```text
 patient-readmission-analysis/
-├── .github/                  # GitHub Actions CI workflows & integrations
+├── .github/                  # GitHub Actions CI workflows & auto-analysis triggers
 │   └── workflows/
+│       └── auto_analysis.yml # Daily automated notebook execution & git push workflow
 ├── .vscode/                  # VS Code workspace settings & SQLTools configuration
 │   └── settings.json
+├── data/                     # Subdirectory for raw and processed datasets (ignored by Git)
+│   ├── raw/
+│   └── processed/
+├── docs/                     # Detailed project specifications and reports
+│   ├── data_dictionary.md    # Schema profiles of staging and cleaned data
+│   ├── data_quality_report.md# Missingness, inclusion criteria, and PHI audits
+│   └── methodology.md        # Comparative framework of Polars vs. PostgreSQL
 ├── charts/                   # Visualizations, EDA charts, and ROC/PR curve exports
 ├── notebooks/                # Python analysis & predictive modeling
-│   └── analysis.ipynb        # Jupyter notebook with ML classifiers (RandomForest, XGBoost)
+│   └── analysis.ipynb        # Jupyter notebook with ML classifiers (RandomForest, Random Forest)
 ├── sql/                      # Modular SQL pipeline scripts
-│   ├── 01_staging.sql        # Table definitions, schemas, and primary indexing
-│   ├── 02_profiling.sql      # In-database profiling, null audits, and distributions
-│   └── 03_cleaning_views.sql # Transformation views, ICD-9 groupings, and feature encoding
-├── .env.local                # Local environment secrets (ignored by Git)
+│   ├── 01_staging.sql        # Table definitions, staging ingestion, and indexes
+│   ├── 02_profiling.sql      # Database profiling and distribution audits
+│   ├── 03_quality_checks.sql # Constraints, duplicates, and HIPAA PHI checks
+│   ├── 04_cleaning.sql       # Transforming views, ICD-9 groupings, and target variables
+│   ├── 05_validation.sql     # Post-cleaning validations & structural checks
+│   └── 06_analysis.sql       # Aggregated reporting queries on readmissions
+├── polars/                   # Parallel data pipeline using Python Polars
+│   ├── 01_load.py            # Loading raw data and db staging uploads
+│   ├── 02_profiling.py       # Polars profiling statistical summaries
+│   ├── 03_quality_checks.py  # Duplicates and value boundary assertions
+│   ├── 04_cleaning.py        # Maps diagnosis codes and clean features
+│   ├── 05_validation.py      # Cleansing validation & schema checks
+│   └── 06_analysis.py        # Report tables and chart generation
+├── .env                      # Local environment configuration secrets (ignored by Git)
 ├── .gitignore                # Git exclusion rules
-├── import_data_polars.py     # High-speed ADBC CSV-to-Neon ingestion pipeline
-├── PROJECT.md                # In-depth clinical background, metrics, and data dictionary
+├── requirements.txt          # Python library dependencies (polars, pandas, etc.)
+├── PROJECT.md                # High-level project objectives & workflow stages
 └── README.md                 # Full project documentation & step-by-step guide (this file)
 ```
 
@@ -265,25 +283,35 @@ python3 -m venv venv
 source venv/bin/activate    # On Windows: venv\Scripts\activate
 
 # Install required dependencies
-pip install polars adbc-driver-postgresql pandas numpy matplotlib seaborn scikit-learn jupyter python-dotenv
+pip install -r requirements.txt
 ```
 
 ### 2. Configure Environment
-Create `.env.local` in the project root:
+Create a `.env` file in the project root:
 ```env
-DATABASE_URL="postgresql://neondb_owner:YOUR_PASSWORD@ep-dry-flower-ayu8lyw9-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require"
+DATABASE_URL="postgresql://neondb_owner:npg_rgwvOKePYN93@ep-dry-flower-ayu8lyw9-pooler.c-5.us-east-2.aws.neon.tech/neondb?channel_binding=require&sslmode=require"
 ```
 
-### 3. Run Database Setup & Ingestion
-1. **Initialize Schemas**: Run `sql/01_staging.sql` in SQLTools or via `psql`.
-2. **Ingest Raw Data**:
-   ```bash
-   python import_data_polars.py
-   ```
-3. **Profile the Data**: Execute `sql/02_profiling.sql` to check data distributions and missing values.
-4. **Create Analytical Views**: Execute `sql/03_cleaning_views.sql` to build clean, model-ready feature views.
+### 3. Run the SQL Pipeline
+1. **Staging & Ingestion**: Execute `sql/01_staging.sql` to create staging tables and load all raw encounters.
+2. **Profiling**: Execute `sql/02_profiling.sql` to analyze distributions and verify raw statistics.
+3. **Data Quality Checks**: Execute `sql/03_quality_checks.sql` to run duplicates and HIPAA compliance verification.
+4. **Data Cleaning**: Execute `sql/04_cleaning.sql` to define the analytical clean view.
+5. **Post-Clean Validation**: Execute `sql/05_validation.sql` to run schema constraints and range validation.
+6. **Aggregated Analysis**: Run `sql/06_analysis.sql` to pull readmission metrics directly in SQL.
 
-### 4. Run Machine Learning & EDA
+### 4. Run the Polars Pipeline
+Alternatively, run the Python-based data engineering pipeline:
+```bash
+python3 polars/01_load.py             # Load raw CSV and stage to database
+python3 polars/02_profiling.py        # Generate statistical summaries
+python3 polars/03_quality_checks.py   # Run null and duplicate quality tests
+python3 polars/04_cleaning.py         # Standardize features and group ICD codes
+python3 polars/05_validation.py       # Assert cleaned data constraints
+python3 polars/06_analysis.py         # Generate reporting tables and save charts
+```
+
+### 5. Run Machine Learning & EDA
 Start Jupyter Notebook to execute the modeling pipeline:
 ```bash
 jupyter notebook notebooks/analysis.ipynb
@@ -322,6 +350,25 @@ neonctl branches create --name dev-analytics
    - Use the `-pooler` endpoint (e.g., `ep-dry-flower-...-pooler...`) for applications with multiple concurrent connections or high-throughput batch writes.
 4. **Security Notice**:
    - Never commit `.env.local` or raw passwords to GitHub. Ensure `.gitignore` includes all environment configuration and sensitive data exports.
+
+---
+
+## 🔒 Compliance Audits & Pipeline Execution History
+
+The first three stages of the SQL pipeline were executed successfully on the Neon cloud database.
+
+### 1. Ingestion Audit (`01_staging.sql`)
+- **Action**: Staged raw encounters from `public.diabetic_data` into `staging.raw_clinical_records`.
+- **Result**: Successfully ingested exactly **101,766** patient records. Primary index keys were applied on `encounter_id` and indices mapped on `patient_id` and `readmitted_flag` for search speed.
+
+### 2. Demographic & Outlier Profiling (`02_profiling.sql`)
+- **Patient Volume**: Audited 101,766 total encounters representing **71,518** unique patients (with 0 duplicate `encounter_id` instances).
+- **Target Distribution**: Found 53.91% records had no readmission, 11.16% readmitted in under 30 days, and 34.93% readmitted in over 30 days.
+- **Length of Stay**: Evaluated average hospital stay durations: 4.77 days for <30 readmissions, 4.50 days for >30 readmissions, and 4.25 days for no readmission.
+
+### 3. HIPAA & HL7 Compliance Checks (`03_quality_checks.sql`)
+- **Direct Identifiers check (HIPAA Safe Harbor)**: Verified that no columns leaked PHI (Protected Health Information). Specifically, we audited string text columns for names, SSNs, and ZIP code formats; **0 leaks** were found. The database represents a fully de-identified research corpus.
+- **Clinical Terminology Consistency (HL7/ICD-9)**: Audited primary diagnosis ICD-9 codes. Verified that only 3 records had invalid gender categories, and 21 records lacked primary diagnostics (which are cleaned and grouped in the next stages).
 
 ---
 

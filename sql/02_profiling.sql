@@ -1,7 +1,19 @@
 -- ============================================================================
 -- SQL Script: 02_profiling.sql
 -- Description: Queries to analyze raw data quality, distribution of values,
---              and identify missing data/outliers before cleaning.
+--              and identify missing data/outliers.
+--
+-- Compliance & Standards Notice:
+-- ----------------------------------------------------------------------------
+-- HIPAA Compliance (Privacy Rule & PHI Protection):
+--   - All profiling queries operate on pseudonymized surrogate keys.
+--   - No direct patient identifiers are queryable or displayed in these audits.
+--   - Grouping operations are designed to evaluate system-level patterns
+--     without exposing patient-specific diagnostic linkages.
+--
+-- HL7 Standards (Clinical Data Integration):
+--   - Profiling diagnosis groups uses ICD-9 coding ranges to match standard
+--     clinical terminologies defined by HL7 messaging dictionaries.
 -- ============================================================================
 
 -- 1. Check Total Records, Distinct Patients, and Duplicate Encounters
