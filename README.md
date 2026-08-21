@@ -80,11 +80,7 @@ Once logged in, deploy your managed PostgreSQL database cluster:
    - Select **"PostgreSQL"** or **"Connection string (URI)"** format:
      ```text
      postgresql://[user]:[password]@[host]/[database]?sslmode=require
-     ```
-   - Example URI structure:
-     ```text
-     postgresql://neondb_owner:npg_rgwvOKePYN93@ep-dry-flower-ayu8lyw9-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require
-     ```
+      
    > ⚠️ **Important**: Save your password immediately. Neon passwords are generated securely and shown once during initial role creation.
 
 ---
