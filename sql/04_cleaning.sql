@@ -1,8 +1,8 @@
 -- ============================================================================
--- SQL Script: 03_cleaning_views.sql
--- Description: Transforms and cleans raw staging data into an analytical view.
+-- SQL Script: 04_cleaning.sql
+-- Description: Transforms and cleans raw staging data into a structured analytical view.
 --              Includes null handling, age grouping, ICD-9 code categorization,
---              and boolean mapping for the readmission target variable.
+--              and standardizing the readmission target variable.
 -- ============================================================================
 
 CREATE OR REPLACE VIEW staging.v_clean_patient_data AS
@@ -18,10 +18,13 @@ WITH formatted_data AS (
             ELSE 'Unknown/Other'
         END AS gender_clean,
         
-        -- Standardize age bins or extract numeric values
-        COALESCE(age, 'Unknown') AS age_group,
+        -- Standardize age bins
+        CASE 
+            WHEN age = '?' OR age IS NULL THEN 'Unknown'
+            ELSE age
+        END AS age_group,
         
-        -- Default numeric variables to 0 if null
+        -- Default numeric variables
         COALESCE(length_of_stay, 0) AS length_of_stay,
         COALESCE(num_lab_procedures, 0) AS num_lab_procedures,
         COALESCE(num_medications, 0) AS num_medications,
@@ -37,7 +40,10 @@ WITH formatted_data AS (
         END AS admission_type_clean,
         
         -- Standardize diagnosis code
-        COALESCE(primary_diagnosis_code, 'Unknown') AS primary_diag_code,
+        CASE 
+            WHEN primary_diagnosis_code = '?' OR primary_diagnosis_code IS NULL THEN 'Unknown'
+            ELSE primary_diagnosis_code
+        END AS primary_diag_code,
         
         -- Standardize target variable
         CASE 
@@ -47,7 +53,7 @@ WITH formatted_data AS (
         
     FROM staging.raw_clinical_records
     WHERE patient_id IS NOT NULL
-      AND gender NOT IN ('Unknown/Invalid')
+      AND gender NOT IN ('Unknown/Invalid', 'Unknown')
 )
 SELECT 
     *,
