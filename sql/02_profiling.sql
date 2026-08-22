@@ -6,14 +6,82 @@
 -- Compliance & Standards Notice:
 -- ----------------------------------------------------------------------------
 -- HIPAA Compliance (Privacy Rule & PHI Protection):
---   - All profiling queries operate on pseudonymized surrogate keys.
---   - No direct patient identifiers are queryable or displayed in these audits.
---   - Grouping operations are designed to evaluate system-level patterns
---     without exposing patient-specific diagnostic linkages.
+--   - All profiling queries operate on pseudonymized keys.
+--   - Audits missingness distribution dynamically to identify fields with high
+--     sparsity (like weight) which are dropped to protect patient uniqueness.
 --
 -- HL7 Standards (Clinical Data Integration):
---   - Profiling diagnosis groups uses ICD-9 coding ranges to match standard
---     clinical terminologies defined by HL7 messaging dictionaries.
+--   - Checks data types and counts of standard hospital vocabularies.
+-- ============================================================================
+
+-- ============================================================================
+-- DYNAMIC COLUMN-LEVEL DATA QUALITY PROFILING DASHBOARD
+-- ============================================================================
+-- Step-by-Step Explanation of the Query:
+--
+-- 1. CTE: unnested
+--    - Uses 'to_jsonb(t)' to convert each database row into a JSONB object.
+--    - Uses 'LATERAL jsonb_each_text()' to unpack the JSONB object key-value pairs
+--      into virtual rows. The key represents the column name, and the value
+--      represents the string value. This allows us to pivot 50 columns into
+--      a key-value list dynamically without writing 50 separate column audits.
+--    - The CASE statement standardizes character placeholders ('?', 'None', '')
+--      used in clinical exports into true SQL NULL values, aligning with standard
+--      HL7 missing value definitions and enabling HIPAA Safe Harbor completeness checks.
+--
+-- 2. CTE: summary
+--    - Groups the unnested key-value records by column_name.
+--    - 'COUNT(*) - COUNT(col_value)' calculates total nulls (since COUNT(col_value)
+--      excludes NULLs).
+--    - 'COUNT(DISTINCT col_value)' gets the number of unique attributes (critical
+--      for validating high-cardinality patient identifiers).
+--    - 'ROUND(... * 100, 2)' computes the exact missingness percentage.
+--
+-- 3. Final Query:
+--    - Joins the metrics table with 'information_schema.columns' to pull the physical
+--      data type of each column dynamically.
+--    - Orders by s.null_percentage DESC to immediately highlight sparse columns.
+-- ============================================================================
+
+WITH unnested AS (
+    SELECT 
+        kv.key AS column_name,
+        -- Treat '?', 'None', and empty strings as NULL values
+        CASE 
+            WHEN kv.value IN ('?', 'None', '') THEN NULL 
+            ELSE kv.value 
+        END AS col_value
+    FROM public.diabetic_data t,
+    LATERAL jsonb_each_text(to_jsonb(t)) kv
+),
+summary AS (
+    SELECT 
+        column_name,
+        COUNT(*) - COUNT(col_value) AS nulls,
+        COUNT(DISTINCT col_value) AS uniq_values,
+        COUNT(*) AS total_data,
+        ROUND(
+            ((COUNT(*) - COUNT(col_value))::numeric / COUNT(*)::numeric) * 100, 
+            2
+        ) AS null_percentage
+    FROM unnested
+    GROUP BY column_name
+)
+SELECT 
+    s.column_name,
+    c.data_type,
+    s.nulls,
+    s.uniq_values,
+    s.total_data,
+    s.null_percentage
+FROM summary s
+LEFT JOIN information_schema.columns c 
+    ON c.table_name = 'diabetic_data' 
+   AND c.column_name = s.column_name
+ORDER BY s.null_percentage DESC;
+
+-- ============================================================================
+-- SUPPLEMENTAL PROFILE QUERIES
 -- ============================================================================
 
 -- 1. Check Total Records, Distinct Patients, and Duplicate Encounters
@@ -23,15 +91,7 @@ SELECT
     COUNT(*) - COUNT(DISTINCT encounter_id) AS duplicate_encounters
 FROM staging.raw_clinical_records;
 
--- 2. Null Value Auditing
-SELECT 
-    COUNT(*) FILTER (WHERE age IS NULL OR age = '') AS null_age_count,
-    COUNT(*) FILTER (WHERE gender IS NULL OR gender = '') AS null_gender_count,
-    COUNT(*) FILTER (WHERE primary_diagnosis_code IS NULL OR primary_diagnosis_code = '') AS null_diagnosis_count,
-    COUNT(*) FILTER (WHERE admission_type IS NULL OR admission_type = '') AS null_admission_type_count
-FROM staging.raw_clinical_records;
-
--- 3. Age Distribution
+-- 2. Age Distribution
 SELECT 
     age,
     COUNT(*) AS encounter_count,
@@ -40,30 +100,10 @@ FROM staging.raw_clinical_records
 GROUP BY age
 ORDER BY age;
 
--- 4. Readmission Distribution (Target Variable)
+-- 3. Readmission Distribution (Target Variable)
 SELECT 
     readmitted_flag,
     COUNT(*) AS encounter_count,
     ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER(), 2) AS percentage
-FROM staging.raw_clinical_records
-GROUP BY readmitted_flag;
-
--- 5. Demographics vs. Readmissions (Cross-tabulation sample)
-SELECT 
-    gender,
-    COUNT(*) AS total_encounters,
-    COUNT(*) FILTER (WHERE readmitted_flag = 'Yes') AS readmitted_count,
-    ROUND(100.0 * COUNT(*) FILTER (WHERE readmitted_flag = 'Yes') / COUNT(*), 2) AS readmission_rate
-FROM staging.raw_clinical_records
-GROUP BY gender;
-
--- 6. Length of Stay Metrics by Readmission Status
-SELECT 
-    readmitted_flag,
-    COUNT(*) AS encounters,
-    MIN(length_of_stay) AS min_stay,
-    MAX(length_of_stay) AS max_stay,
-    AVG(length_of_stay) AS avg_stay,
-    STDDEV(length_of_stay) AS stddev_stay
 FROM staging.raw_clinical_records
 GROUP BY readmitted_flag;

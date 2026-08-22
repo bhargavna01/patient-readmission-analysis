@@ -359,6 +359,13 @@ The first three stages of the SQL pipeline were executed successfully on the Neo
 
 ### 2. Demographic & Outlier Profiling (`02_profiling.sql`)
 - **Patient Volume**: Audited 101,766 total encounters representing **71,518** unique patients (with 0 duplicate `encounter_id` instances).
+- **Dynamic Schema Profiling (JSONB Unnesting)**: Implemented an advanced PostgreSQL unnesting query using `LATERAL jsonb_each_text(to_jsonb(t))` to dynamically pivot and audit all 50 columns in a single query. This query maps non-standard clinical missing placeholders (`?`, `None`, `""`) to SQL NULLs, joins metadata from `information_schema.columns` to fetch physical data types, and outputs sorted missingness statistics.
+- **Top Sparse Columns Audited**:
+  - `weight` (96.86% missing)
+  - `max_glu_serum` (94.75% missing)
+  - `A1Cresult` (83.28% missing)
+  - `medical_specialty` (49.08% missing)
+  - `payer_code` (39.56% missing)
 - **Target Distribution**: Found 53.91% records had no readmission, 11.16% readmitted in under 30 days, and 34.93% readmitted in over 30 days.
 - **Length of Stay**: Evaluated average hospital stay durations: 4.77 days for <30 readmissions, 4.50 days for >30 readmissions, and 4.25 days for no readmission.
 
