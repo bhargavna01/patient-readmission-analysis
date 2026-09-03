@@ -373,6 +373,44 @@ The first three stages of the SQL pipeline were executed successfully on the Neo
 - **Direct Identifiers check (HIPAA Safe Harbor)**: Verified that no columns leaked PHI (Protected Health Information). Specifically, we audited string text columns for names, SSNs, and ZIP code formats; **0 leaks** were found. The database represents a fully de-identified research corpus.
 - **Clinical Terminology Consistency (HL7/ICD-9)**: Audited primary diagnosis ICD-9 codes. Verified that only 3 records had invalid gender categories, and 21 records lacked primary diagnostics (which are cleaned and grouped in the next stages).
 
+### 4. Comprehensive Clinical Data Cleaning (`04_cleaning.sql` & `polars/04_cleaning.py`)
+- **Coverage**: Applied data cleaning and clinical transformations across **all 50 columns** of the raw EHR dataset.
+- **Key Transformations & Clinical Rationale**:
+  1. **Cohort Exclusion (HIPAA & Demographic Quality)**: Excluded exactly 3 records where `gender` was recorded as `'Unknown/Invalid'`, producing a clean cohort of **101,763** encounters and **71,515** unique patients.
+  2. **CMS 30-Day Readmission Standard**: Binarized the target variable based on the CMS Hospital Readmissions Reduction Program (HRRP) definition: `<30` days was mapped to `1` (positive readmission: 11,357 encounters, 11.16%), while `>30` and `NO` were mapped to `0` (90,406 encounters, 88.84%).
+  3. **ICD-9 Clinical Taxonomy Grouping**: Mapped raw primary (`diag_1`), secondary (`diag_2`), and tertiary (`diag_3`) codes into 9 standardized clinical clusters: Circulatory (390–459, 785), Respiratory (460–519, 786), Digestive (520–579, 787), Diabetes (250.xx), Genitourinary (580–629, 788), Neoplasms (140–239), Musculoskeletal (710–739), Injury (800–999), and Other.
+  4. **Medication Normalization (24 Diabetes Drugs)**: Standardized dosage statuses (`No`, `Steady`, `Up`, `Down`) across all 23 active medications (and 1 constant drug), aliased hyphenated column names for ANSI SQL compliance, and engineered an `active_med_count` metric.
+  5. **Utilization Aggregation**: Engineered `total_prior_visits` by summing outpatient, emergency, and inpatient encounters over the preceding 12 months.
+  6. **Glycemic Monitoring (HbA1c & Glucose)**: Standardized `None` entries to `'Not Tested'`, isolating glycemic monitoring cohorts (`Norm`, `>7`, `>8`).
+- **Dual Pipeline Implementation**:
+  - **SQL View**: Deployed as `staging.v_clean_patient_data` on Neon PostgreSQL.
+  - **Polars Pipeline**: Produced the standardized analytical dataset `data/processed/clean_diabetic_data.csv` (101,763 rows × 73 columns).
+
+### 5. Post-Cleaning Data Validation (`05_validation.sql` & `polars/05_validation.py`)
+- **Validation Suite**: Executed 5 rigorous automated tests across both the relational database and Python in-memory engines:
+  1. **Cohort Drop Assertion**: Confirmed raw (101,766) - clean (101,763) = exactly 3 rows dropped (**PASSED**).
+  2. **Gender Domain Constraint**: Confirmed gender strictly contains `['Male', 'Female']` (**PASSED**).
+  3. **Target Invariant**: Confirmed target variable strictly contains binary `{0, 1}` with exactly 11,357 positive events (**PASSED**).
+  4. **Critical Field Completeness**: Confirmed 0 null values across all demographic, diagnostic, and target fields (**PASSED**).
+  5. **Clinical Range Validation**: Confirmed 100% compliance of hospital length of stay within 1 to 14 days (**PASSED**).
+
+### 6. Exploratory Clinical Analytics & Key Drivers (`06_analysis.sql` & `polars/06_analysis.py`)
+- **Institutional Baseline**: 101,763 encounters across 71,515 unique patients exhibited an overall 30-day readmission rate of **11.16%**.
+- **Clinical Findings**:
+  1. **Prior Healthcare Utilization (Primary Signal)**: Readmission risk escalates sharply with prior visit frequency:
+     - 0 Prior Visits: **8.18%** readmission rate
+     - 1–2 Prior Visits: **12.59%** readmission rate
+     - 3–5 Prior Visits: **16.39%** readmission rate
+     - 6+ Prior Visits (Super-utilizers): **25.51%** readmission rate (a **3.1x risk elevation**).
+  2. **Clinical Diagnosis Vulnerability**: Highest readmission rates were observed in patients admitted for **Diabetes** (12.98%) and **Injury** (12.25%). **Circulatory conditions** represented the largest clinical volume (30,436 encounters, 11.45% readmission rate).
+  3. **Glycemic Testing Protective Effect**: Patients who did not receive an HbA1c test had a higher readmission rate (**11.42%**) than those who received testing (**9.66% – 10.05%**), demonstrating the clinical benefit of active glycemic surveillance.
+  4. **Resource Consumption**: Readmitted patients exhibited significantly higher average length of stay (4.77 days vs. 4.35 days), higher average laboratory procedures (44.2 vs. 42.9), and higher average medication counts (16.9 vs. 15.9).
+- **Generated Visualizations**:
+  - `charts/readmission_by_age.png`
+  - `charts/readmission_by_diagnosis.png`
+  - `charts/readmission_by_prior_visits.png`
+  - `charts/readmission_by_a1c.png`
+
 ---
 
 ## 📄 License & Attribution
