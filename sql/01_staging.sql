@@ -44,9 +44,9 @@ CREATE TABLE staging.raw_clinical_records (
     readmitted_flag VARCHAR(10)
 );
 
--- Indexing for performance
-CREATE INDEX idx_raw_patient_id ON staging.raw_clinical_records(patient_id);
-CREATE INDEX idx_raw_readmitted_flag ON staging.raw_clinical_records(readmitted_flag);
+-- Indexing for performance (IF NOT EXISTS makes the script re-runnable / idempotent)
+CREATE INDEX IF NOT EXISTS idx_raw_patient_id ON staging.raw_clinical_records(patient_id);
+CREATE INDEX IF NOT EXISTS idx_raw_readmitted_flag ON staging.raw_clinical_records(readmitted_flag);
 
 -- Ingest/Stage Data from public.diabetic_data
 TRUNCATE TABLE staging.raw_clinical_records;
